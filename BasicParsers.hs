@@ -37,10 +37,10 @@ whitespace parser = (many whiteParser *> parser) <* many whiteParser
 
 -- FP2.3
 sep1 :: Parser a -> Parser b -> Parser [a]
-sep1 p s = some (p <* s <|> p)
+sep1 p s = (\x y -> [x]++y) <$> p <*> some (s *> p)
 
 sep :: Parser a -> Parser b -> Parser [a]
-sep p s = many (p <* s <|> p)
+sep p s = (\x y -> [x]++y) <$> p <*> many (s *> p)
 
 
 -- TODO: Ask a TA to check it
