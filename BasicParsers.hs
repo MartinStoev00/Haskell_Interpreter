@@ -29,6 +29,7 @@ dig = P p
 between :: Parser a -> Parser b -> Parser c -> Parser b
 between a b c = (\x y z -> y) <$> a <*> b <*> c
 
+-- Parser to parse whitespace tokens
 whiteParser :: Parser Char
 whiteParser = char '\t' <|> char '\n' <|> char ' '
 
@@ -77,5 +78,3 @@ parens p = (char '(' *> p) <* char ')'
 
 braces :: Parser a -> Parser a 
 braces p = (char '[' *> p) <* char ']'
-
--- TODO Ask a TA about efficiency 
