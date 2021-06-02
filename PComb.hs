@@ -43,15 +43,18 @@ instance Applicative Parser where
 
 -- Testing:
 -- runParser testApp (Stream "saa")
-testApp = (\x y -> [x,y]) <$> (char 's') <*> (char 'a') z
+testApp = (\x y -> [x,y]) <$> (char 's') <*> (char 'a')
 -- testApp = (\x y z -> y) <$> (char 's') <*> (char 'a') <*> (char 'a')
 
 -- FP1.6
 instance Alternative Parser where
     empty = P (\_ -> [])
-    p1 <|> p2 = P (\stream -> if (null firstP) 
-        then (runParser p2 stream) 
-        else (firstP)
-        where firstP = runParser p1 stream 
+    p1 <|> p2 = P p 
+        where
+            p stream = if (null firstP) then (runParser p2 stream) else (firstP)
+                where 
+                    firstP = runParser p1 stream 
+                      
+                    
 
 -- runParser (char 'a' <|> char 'b') (Stream "ba")

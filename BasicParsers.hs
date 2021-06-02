@@ -77,4 +77,4 @@ parens :: Parser a -> Parser a
 parens p = (char '(' *> p) <* char ')'
 
 braces :: Parser a -> Parser a 
-braces p = (char '[' *> p) <* char ']'
+braces p = (char '{' *> p) <* char '}'
