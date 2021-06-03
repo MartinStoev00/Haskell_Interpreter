@@ -74,7 +74,7 @@ symbol :: String -> Parser String
 symbol str = whitespace (string str)
 ---------------------------------
 parens :: Parser a -> Parser a 
-parens p = (char '(' *> p) <* char ')'
+parens p = whitespace ((char '(' *> p) <* char ')')
 
 braces :: Parser a -> Parser a 
-braces p = (char '{' *> p) <* char '}'
+braces p = whitespace ((char '{' *> p) <* char '}')

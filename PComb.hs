@@ -54,7 +54,5 @@ instance Alternative Parser where
             p stream = if (null firstP) then (runParser p2 stream) else (firstP)
                 where 
                     firstP = runParser p1 stream 
-                      
-                    
 
 -- runParser (char 'a' <|> char 'b') (Stream "ba")
