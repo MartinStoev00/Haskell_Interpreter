@@ -69,7 +69,7 @@ instance Arbitrary Func where
                   expression  = arbitrary :: Gen Expr
 
 instance Arbitrary Param where
-      arbitrary = oneof [Num   <$> (arbitrary :: Gen Integer)
+      arbitrary = oneof [Num   <$>  suchThat (arbitrary :: Gen Integer) isPositive
                         , Id    <$> suchThat identifierStr correctLength]
 
 instance Arbitrary Cond where
@@ -79,8 +79,8 @@ instance Arbitrary Ords where
       arbitrary = oneof [GreaterThan <$> suchThat ordStr greaterThan, EqualTo <$> suchThat ordStr equalTo, LesserThan <$> suchThat ordStr lessThan] 
 
 instance Arbitrary Expr where
-      arbitrary = frequency [(10, Number      <$> (arbitrary :: Gen Integer))
-              ,(10, Identifier  <$> suchThat identifierStr correctLength)
+      arbitrary = frequency [(10, Number <$> suchThat (arbitrary :: Gen Integer) isPositive)
+              ,(10, Identifier <$> suchThat identifierStr correctLength)
               ,(1, Add         <$> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Expr))
               ,(1, Sub         <$> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Expr))
               ,(1, Mult        <$> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Expr))
@@ -109,11 +109,16 @@ identifierStr = listOf $ elements "abcde"
 correctLength :: String -> Bool
 correctLength str = (length str) == 3
 
+isPositive :: Integer -> Bool
+isPositive x = x >= 0
+
 prop_GenExpr :: Expr -> Bool
 prop_GenExpr expression = expression == (compileExpr (pretty expression))
 
 prop_GenProg :: Prog -> Bool
 prop_GenProg program = program == (compile (pretty program))
+
+testEq program = program == (compile (pretty program))
 
 genX = generate (arbitrary :: Gen Expr)
 -- generate (arbitrary :: Gen Expr)
@@ -171,7 +176,7 @@ pf :: Func -> String
 pf (Function name params exp) = name ++ (foldl (\f o -> (f ++ " " ++ (prettyParam o))) "" params) ++ " := "  ++ (pe exp) ++ [';']
 
 pe :: Expr -> String
-pe (Number x) = show x :: Integer
+pe (Number x) = show x :: String
 pe (Identifier s) = s 
 pe (Add e1 e2) = (pe e1) ++ " + " ++ (pe e2)
 pe (Sub e1 e2) = (pe e1) ++ ['-'] ++ (pe e2)
