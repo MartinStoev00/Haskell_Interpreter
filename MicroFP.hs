@@ -11,8 +11,10 @@ import PComb
 import BasicParsers
 import Test.QuickCheck
 import Test.QuickCheck.All
+import System.FilePath
 
--- FP3.1
+-- FP3.3
+-- FP3.3 continues below where the functions are defined.
 class Pretty a where 
       pretty :: a -> String
 
@@ -27,11 +29,12 @@ instance Pretty Ords where
 instance Pretty Param where
       pretty = prettyParam
 
+-- FP3.1
 data Prog = Program Func [Func]
-            deriving Show
+            deriving (Show, Eq)
 
 data Func = Function String [Param] Expr
-            deriving Show
+            deriving (Show, Eq)
 
 data Expr = Number Integer
           | Identifier String
@@ -41,17 +44,80 @@ data Expr = Number Integer
           | Call String [Expr]
           | If Cond Expr Expr
           | None
-          deriving Show
+          deriving (Show, Eq)
 
 data Cond = Condition Expr Ords Expr
-            deriving Show
+            deriving (Show, Eq)
 
 data Param = Num Integer
            | Id String
-           deriving Show
+           deriving (Show, Eq)
 
 data Ords = LesserThan String | EqualTo String | GreaterThan String
-            deriving Show
+            deriving (Show, Eq)
+
+-- FP5.6 
+instance Arbitrary Prog where
+      arbitrary = Program <$> f <*> fs
+            where f     = arbitrary :: Gen Func
+                  fs    = resize 3 $ (arbitrary :: Gen [Func])
+
+instance Arbitrary Func where
+      arbitrary = Function <$> genName <*> params <*> expression
+            where genName     = suchThat funcStr correctLength
+                  params      = resize 3 $ (arbitrary :: Gen [Param])
+                  expression  = arbitrary :: Gen Expr
+
+instance Arbitrary Param where
+      arbitrary = oneof [Num   <$> (arbitrary :: Gen Integer)
+                        , Id    <$> suchThat identifierStr correctLength]
+
+instance Arbitrary Cond where
+      arbitrary = Condition <$> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Ords) <*> (arbitrary :: Gen Expr)
+
+instance Arbitrary Ords where
+      arbitrary = oneof [GreaterThan <$> suchThat ordStr greaterThan, EqualTo <$> suchThat ordStr equalTo, LesserThan <$> suchThat ordStr lessThan] 
+
+instance Arbitrary Expr where
+      arbitrary = frequency [(10, Number      <$> (arbitrary :: Gen Integer))
+              ,(10, Identifier  <$> suchThat identifierStr correctLength)
+              ,(1, Add         <$> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Expr))
+              ,(1, Sub         <$> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Expr))
+              ,(1, Mult        <$> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Expr))
+              ,(1, Call        <$> suchThat funcStr correctLength <*> resize 3 (arbitrary :: Gen [Expr]))
+              ,(1, If          <$> (arbitrary :: Gen Cond) <*> (arbitrary :: Gen Expr) <*> (arbitrary :: Gen Expr))]
+
+
+ordStr :: Gen String
+ordStr = listOf $ elements ">=<"
+
+greaterThan :: String -> Bool
+greaterThan str = str == ">"
+
+equalTo :: String -> Bool
+equalTo str = str == "=="
+
+lessThan :: String -> Bool
+lessThan str = str == "<"
+
+funcStr :: Gen String
+funcStr = listOf $ elements "fghk"
+
+identifierStr :: Gen String
+identifierStr = listOf $ elements "abcde"
+
+correctLength :: String -> Bool
+correctLength str = (length str) == 3
+
+prop_GenExpr :: Expr -> Bool
+prop_GenExpr expression = expression == (compileExpr (pretty expression))
+
+prop_GenProg :: Prog -> Bool
+prop_GenProg program = program == (compile (pretty program))
+
+genX = generate (arbitrary :: Gen Expr)
+-- generate (arbitrary :: Gen Expr)
+-- generate (arbitrary :: Gen Prog)
 
 -- FP3.2
 fibonacci :: Prog
@@ -105,7 +171,7 @@ pf :: Func -> String
 pf (Function name params exp) = name ++ (foldl (\f o -> (f ++ " " ++ (prettyParam o))) "" params) ++ " := "  ++ (pe exp) ++ [';']
 
 pe :: Expr -> String
-pe (Number x) = show x
+pe (Number x) = show x :: Integer
 pe (Identifier s) = s 
 pe (Add e1 e2) = (pe e1) ++ " + " ++ (pe e2)
 pe (Sub e1 e2) = (pe e1) ++ ['-'] ++ (pe e2)
@@ -148,9 +214,7 @@ evalExpr p binds (Sub e1 e2) = (evalExpr p binds e1) - (evalExpr p binds e2)
 evalExpr p binds (Mult e1 e2) = (evalExpr p binds e1) * (evalExpr p binds e2)
 evalExpr p binds (Call fname args) = eval p fname (map (\x -> evalExpr p binds x) args)
 evalExpr p binds (If cond e1 e2) = if (evalCondition p binds cond) then (evalExpr p binds e1) else (evalExpr p binds e2)
--- [(1-1),(2-1),e3,e4,e5...] -> [0,1,2,3,4,...]
 -- TODO: is this needed?
--- evalExpr binds (None) = 0
 
 evalCondition :: Prog -> [(String, Integer)] -> Cond -> Bool
 evalCondition p binds (Condition e1 (LesserThan _) e2) = (evalExpr p binds e1) < (evalExpr p binds e2)
@@ -161,8 +225,7 @@ evalFunction :: Prog -> [Integer] -> Func -> Integer
 evalFunction p args (Function name a e) = evalExpr p (bind (Function name a e) args) e
 
 eval :: Prog -> String -> [Integer] -> Integer
-eval prog fname args = evalFunction prog args (getFunctionFromName fname prog)
-
+eval prog fname args  = evalFunction prog args (getFunctionFromName fname prog)
 
 getFunctionName :: Func -> String
 getFunctionName (Function fname pars exp) = fname
@@ -178,6 +241,9 @@ getFunctionFromName fname (Program f res)
                   | fname == (getFunctionName f) = f
                   | otherwise                    = getFunctionList fname res
 
+getLastFunction :: Prog -> String
+getLastFunction (Program f []) = getFunctionName f
+getLastFunction (Program f fs) = getFunctionName (last fs)
 
 -- FP4.1
 program :: Parser Prog
@@ -211,9 +277,9 @@ condition :: Parser Cond
 condition = Condition <$> expr <*> ordering <*> expr
 
 ordering :: Parser Ords
-ordering = GreaterThan  <$> symbol ">"
-       <|> EqualTo      <$> symbol "=="  
-       <|> LesserThan   <$> symbol "<"  
+ordering = GreaterThan <$> symbol ">"
+      <|> EqualTo      <$> symbol "=="
+      <|> LesserThan   <$> symbol "<"
 
 
 -- testing for 4.1
@@ -224,11 +290,24 @@ addStr = "add x y := x + y;"
 parseProgram p = runParser program (Stream p)
 parseProgram' p = fst (head (runParser program (Stream p)))
 
+-- filename -> stringreadfromfile -> compile file -> Program (f1) [f2,f3,f4...]
 testParsing x y = show (parseProgram x) == pretty y
 
 -- FP4.2
 compile :: String -> Prog
 compile str = fst (head (runParser program (Stream str)))
+
+compileExpr :: String -> Expr
+compileExpr str = fst (head (runParser expr (Stream str)))
+
+-- compile' :: String -> [String, (Expr, Stream)]
+compile' str = (str, (runParser expr (Stream str)))
+
+-- FP4.3
+runFile :: FilePath -> [Integer] -> IO Integer
+runFile path args = eval <$> prog <*> fname <*> pure args
+                        where prog = fmap compile (readFile path)
+                              fname = fmap getLastFunction prog
 
 -- QuickCheck: all prop_* tests
 -- return []

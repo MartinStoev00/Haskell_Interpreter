@@ -1,0 +1,15 @@
+div x y :=
+   if (x < y) then
+     {
+       0
+     } else {
+       1 + div ((x-y), y)
+     };
+
+fib n := if (n < 3) then {
+           1
+ 	 } else {
+	   fib (n-1) + fib (n-2)
+  	 };
+
+add x y := x + y;
