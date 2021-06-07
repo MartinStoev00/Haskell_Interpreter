@@ -9,44 +9,61 @@ import Data.Monoid
 import Test.QuickCheck
 
 -- FP1.1 
+-- Creates a stream of characters to be parsed by the Parser
 data Stream = Stream [Char]
               deriving (Eq, Show)
+s = Stream "text to be parsed"
 
+-- Creates a parser with a method runParser that takes in a stream 
+-- and returns a list of tuples with the first element being 
+-- the parsed result, and the second element being the character(s)
+-- of the stream that have not been parsed 
 data Parser r = P { 
     runParser :: Stream -> [(r, Stream)]
 }
 
 -- FP1.2
+-- Created a Functor instance of Parser in order for the parsed
+-- result to be mapped onto something different that might be needed
 instance Functor Parser where
-  fmap f p = P (\x -> [(f r, s) | (r, s) <- runParser p x])       
+  fmap f p = P (\x -> [(f r, s) | (r, s) <- runParser p x])
 
+-- Creates Parser for 'a' which is then concatenated to "123"
+fmapTest = fmap (\x -> x:"123") (char 'a')
 
 -- FP1.3
+-- Parses a single character if the list is empty or if it fails to parse.
+-- If it parses, it returns a list with a tuple with the parsed result
+-- and the second element being the rest of the unparsed stream
 char :: Char -> Parser Char
 char c = P p 
     where
         p (Stream [])                   = []
         p (Stream (x:xs))   | c == x    = [(x, (Stream xs))]
                             | otherwise = []
-
--- Testing:
-testChar = runParser (char 's') (Stream "saa")
+-- Given a String, this funciton will parse it and check 
+-- if it begins with the character 'a'
+charAParser a = runParser (char 'A') (Stream a)
 
 -- FP1.4
+-- Always returns an empty array which is considered 
+-- a failure to parse
 failure :: Parser a 
 failure = P (\_ -> [])
+failParse a = runParser failure (Stream a)
 
 -- FP1.5
+-- Creates an Applicative instance of Parser which allows 
+-- for another parser to be used on the remainder of the Stream
 instance Applicative Parser where
     pure x  = P (\stream -> [(x, stream)])   -- pure
     x <*> y = P (\stream -> [(r p, s') | (r, s) <- runParser x stream, (p, s') <- runParser y s]) -- composition
 
--- Testing:
--- runParser testApp (Stream "saa")
-testApp = (\x y -> [x,y]) <$> (char 's') <*> (char 'a')
--- testApp = (\x y z -> y) <$> (char 's') <*> (char 'a') <*> (char 'a')
+pureEx = runParser (pure 42) (Stream "123")
 
 -- FP1.6
+-- Created an Alternative instance of Parser which uses
+-- Parsers until one of the is able to parse the input stream 
 instance Alternative Parser where
     empty = P (\_ -> [])
     p1 <|> p2 = P p 
@@ -55,4 +72,4 @@ instance Alternative Parser where
                 where 
                     firstP = runParser p1 stream 
 
--- runParser (char 'a' <|> char 'b') (Stream "ba")
+appEx = runParser ((,) <$> char 'a' <*> char 'b') (Stream "ab")
